@@ -1,0 +1,67 @@
+$Source = "D:\VM"
+$Destination = "G:\TM Backup"
+$LogFile = "G:\TM Backup\backup_log.txt"
+$ErrorLog = "G:\TM Backup\backup_error_log.txt"
+$MaxRetries = 3  # Number of retry attempts
+$RetryWait = 120  # Wait time in seconds before retrying (2 minutes)
+
+# Create log folder if not exists
+If (!(Test-Path $Destination)) {
+    New-Item -ItemType Directory -Path $Destination
+}
+
+# Log start time
+$StartTime = Get-Date
+Add-Content -Path $LogFile -Value "Backup Started: $StartTime"
+$Attempts = 0
+$Success = $false
+
+# Retry Loop
+Do {
+    $Attempts++
+    $RobocopyLog = "G:\TM Backup\robocopy_log.txt"
+    
+    # Run Backup
+    Robocopy $Source $Destination /E /ZB /MT:8 /XO /R:3 /W:10 /LOG:$RobocopyLog
+    $ExitCode = $LASTEXITCODE  # Get Robocopy exit code
+
+    # Check Exit Code
+    If ($ExitCode -eq 0 -or $ExitCode -eq 1) {
+        # 0 = No errors, 1 = Some files copied successfully
+        $Success = $true
+        $EndTime = Get-Date
+        $Duration = $EndTime - $StartTime
+        Add-Content -Path $LogFile -Value "Backup Completed Successfully on Attempt $Attempts: $EndTime"
+        Add-Content -Path $LogFile -Value "Total Backup Time: $($Duration.Hours)h $($Duration.Minutes)m $($Duration.Seconds)s"
+        
+        # Show success pop-up with duration
+        [System.Windows.MessageBox]::Show("Backup completed successfully on attempt $Attempts!`nTotal Time: $($Duration.Hours)h $($Duration.Minutes)m $($Duration.Seconds)s", "Backup Status", 0, 64)
+        Break
+    } Else {
+        # Capture failure details
+        Add-Content -Path $ErrorLog -Value "Backup Attempt $Attempts Failed: $StartTime"
+        Add-Content -Path $ErrorLog -Value "Error Code: $ExitCode"
+        Add-Content -Path $ErrorLog -Value "Check robocopy_log.txt for details."
+        Add-Content -Path $ErrorLog -Value "------------------------------------"
+        
+        # If not the last attempt, wait before retrying
+        If ($Attempts -lt $MaxRetries) {
+            Add-Content -Path $ErrorLog -Value "Retrying backup in $RetryWait seconds..."
+            Start-Sleep -Seconds $RetryWait
+        }
+    }
+} While ($Attempts -lt $MaxRetries -and -not $Success)
+
+# Final Result
+If (-not $Success) {
+    # If all retries failed
+    $EndTime = Get-Date
+    $Duration = $EndTime - $StartTime
+    [System.Windows.MessageBox]::Show("Backup Failed after $MaxRetries attempts!`nTotal Time: $($Duration.Hours)h $($Duration.Minutes)m $($Duration.Seconds)s`nCheck G:\TM Backup\backup_error_log.txt", "Backup Error", 0, 16)
+    Add-Content -Path $ErrorLog -Value "Backup Failed after $MaxRetries attempts at $EndTime"
+    Add-Content -Path $ErrorLog -Value "Total Backup Time: $($Duration.Hours)h $($Duration.Minutes)m $($Duration.Seconds)s"
+}
+
+# Close PowerShell window after 5 seconds
+Start-Sleep -Seconds 5
+Exit
