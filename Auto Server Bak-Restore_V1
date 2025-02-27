@@ -1,0 +1,18 @@
+$Source = "D:\VM"
+$Destination = "G:\TM Backup"
+$LogFile = "G:\TM Backup\backup_log.txt"
+
+# Create log folder if not exists
+If (!(Test-Path $Destination)) {
+    New-Item -ItemType Directory -Path $Destination
+}
+
+# Log start time
+Add-Content -Path $LogFile -Value "Backup Started: $(Get-Date)"
+
+# Perform incremental backup using Robocopy (First time full, then incremental)
+Robocopy $Source $Destination /E /ZB /MT:8 /XO /R:3 /W:10 /LOG+:$LogFile
+
+# Log completion time
+Add-Content -Path $LogFile -Value "Backup Completed: $(Get-Date)"
+Add-Content -Path $LogFile -Value "------------------------------------"
